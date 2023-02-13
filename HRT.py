@@ -1,7 +1,12 @@
+#!/usr/bin/env python
+"""
+Python3.8.6
+blablabla Tonda is the author :)
+"""
 #Import the necessary libraries
 from threading import Thread
 from queue import Queue
-from labjack_unified.devices import LabJackU6
+# from labjack_unified.devices import LabJackU6
 from time import sleep
 
 class stepper(Thread):
@@ -11,7 +16,7 @@ class stepper(Thread):
 
         # set up variables
         self.state = "init"
-        self.lj = lj # LabJackU6 session object
+        self.lj = lj # LabJackU6 session
         self.DIO = DIO # Occupied pins - MUST BE IN RIGHT ORDER!
         self.delay = delay # DO switching interval in seconds
         self.name = name # every nice things has a name!
