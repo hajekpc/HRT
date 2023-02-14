@@ -11,13 +11,13 @@ from time import sleep
 
 class stepper(Thread):
     # stepper is a thread, running a state machine
-    def __init__(self, lj, DIO = ['FIO0', 'FIO1', 'FIO2', 'FIO3'], delay = 0.00002, name = "Stepper"):
+    def __init__(self, lj, DO = [0, 1, 2, 3], delay = 0.00002, name = "Stepper"):
         Thread.__init__(self) #thread initiation - must be started externaly by self.start()
 
         # set up variables
         self.state = "init"
         self.lj = lj # LabJackU6 session
-        self.DIO = DIO # Occupied pins - MUST BE IN RIGHT ORDER!
+        self.DO = DO # Occupied pins - MUST BE IN RIGHT ORDER!
         self.delay = delay # DO switching interval in seconds
         self.name = name # every nice things has a name!
         self.qu = Queue() # commands queue for state machine controll
@@ -29,19 +29,19 @@ class stepper(Thread):
         for pin in range(4):
             pin = -pin # *
             # microstep
-            self.lj.set_digital(self.DIO[pin%len(self.DIO)], 1)
+            self.lj.setDOState(self.DO[pin%len(self.DO)], 1)
             sleep(self.delay)
-            self.lj.set_digital(self.DIO[(pin - 1) % len(self.DIO)], 1) # * 
+            self.lj.setDOState(self.DO[(pin - 1) % len(self.DO)], 1) # * 
             sleep(self.delay)
-            self.lj.set_digital(self.DIO[pin%len(self.DIO)], 0)
+            self.lj.setDOState(self.DO[pin%len(self.DO)], 0)
             sleep(self.delay)
-        self.lj.set_digital(self.DIO[0], 0)
+        self.lj.setDOState(self.DO[0], 0)
         
         print(self.name, "initialized")
 
     def zero(self): # set all pins to zero
-        for pin in self.DIO:
-            self.lj.set_digital(pin, 0)
+        for pin in self.DO:
+            self.lj.setDOState(pin, 0)
             self.state = 'idle'
     
     def step(self, s = -1): # do step in direction s
@@ -51,11 +51,11 @@ class stepper(Thread):
             for pin in range(4):
                 pin = s * pin
                 # microstep
-                self.lj.set_digital(self.DIO[pin % len(self.DIO)], 1)
+                self.lj.setDOState(self.DO[pin % len(self.DO)], 1)
                 sleep(self.delay)
-                self.lj.set_digital(self.DIO[(pin + s * 1) % len(self.DIO)], 1)
+                self.lj.setDOState(self.DO[(pin + s * 1) % len(self.DO)], 1)
                 sleep(self.delay)
-                self.lj.set_digital(self.DIO[pin % len(self.DIO)], 0)
+                self.lj.setDOState(self.DO[pin % len(self.DO)], 0)
                 sleep(self.delay)
             self.x_cur += s
     

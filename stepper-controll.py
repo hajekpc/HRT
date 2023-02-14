@@ -2,13 +2,13 @@
 """
 This is simple example for stepper controll in HRT project.
 """
-from labjack_unified.devices import LabJackU6
+from u6 import U6
 from HRT import stepper
 
 if __name__ == '__main__':
     # Initialization of LabJackU6 and stepper module
-    lj= LabJackU6()
-    lj.display_info()
+    lj= U6()
+
     stpr = stepper(lj= lj)
     stpr.start()
 
