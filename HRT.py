@@ -8,10 +8,12 @@ from threading import Thread
 from queue import Queue
 # from labjack_unified.devices import LabJackU6
 from time import sleep
+from tkinter import *
+
 
 class stepper(Thread):
     # stepper is a thread, running a state machine
-    def __init__(self, lj, DO = [0, 1, 2, 3], delay = 0.00002, name = "Stepper"):
+    def __init__(self, lj, DO = [0, 1, 2, 3], delay = 0.000015, name = "Stepper"):
         Thread.__init__(self) #thread initiation - must be started externaly by self.start()
 
         # set up variables
@@ -29,11 +31,15 @@ class stepper(Thread):
         for pin in range(4):
             pin = -pin # *
             # microstep
-            self.lj.setDOState(self.DO[pin%len(self.DO)], 1)
+            self.lj.setDOState(self.DO[pin % 4], 1)
+            print("turn on pin", pin % 4)
             sleep(self.delay)
-            self.lj.setDOState(self.DO[(pin - 1) % len(self.DO)], 1) # * 
+            self.lj.setDOState(self.DO[(pin - 1) % 4], 1) # *
+            print("turn on pin", (pin - 1) % 4) 
             sleep(self.delay)
-            self.lj.setDOState(self.DO[pin%len(self.DO)], 0)
+            self.lj.setDOState(self.DO[pin % 4], 0)
+            print("turn off pin", pin % 4)
+            
             sleep(self.delay)
         self.lj.setDOState(self.DO[0], 0)
         
@@ -51,26 +57,29 @@ class stepper(Thread):
             for pin in range(4):
                 pin = s * pin
                 # microstep
-                self.lj.setDOState(self.DO[pin % len(self.DO)], 1)
+                self.lj.setDOState(self.DO[pin % 4], 1)
                 sleep(self.delay)
-                self.lj.setDOState(self.DO[(pin + s * 1) % len(self.DO)], 1)
+                self.lj.setDOState(self.DO[(pin + s * 1) % 4], 1)
                 sleep(self.delay)
-                self.lj.setDOState(self.DO[pin % len(self.DO)], 0)
+                self.lj.setDOState(self.DO[pin % 4], 0)
                 sleep(self.delay)
+
             self.x_cur += s
     
     def chase(self):
         # stepper will go to self.x_set
         while self.state == "chase": # chase loop - can be externally stopped by changing state
-            #decide direction 
+            # decide direction 
             if self.x_set > self.x_cur:
                 s = 1
-            else: 
+            elif self.x_set < self.x_cur: 
                 s = -1
-
+            
             if self.x_set == self.x_cur: # stepper is on x_set            
                 self.zero() # set all pins zero
+                print ("", end="\r")
                 print(self.name, "is at x =", self.x_cur) # report position / end of process
+                print(">:")
                 # leave chase loop and set state to "idle"
                 self.state = "idle"
                 break
@@ -95,8 +104,9 @@ class stepper(Thread):
                 break
 
     def cmd(self, cmd):
-        # send cmd to queue 
-        self.qu.put(cmd) 
+        # send cmd to queue
+        if cmd != self.state:
+            self.qu.put(cmd)
         # stop loops inside state machine
         if cmd == "stop": self.state = "stop" # self.stop() is owned by Thread class
     
@@ -109,3 +119,30 @@ class stepper(Thread):
         # move to absolute position
         self.x_set = x
         self.cmd("chase")
+
+class GUI(Tk):
+    def __init__(self):
+        Tk.__init__(self)
+        self.geometry('800x600-0+0')
+        self.resizable(width=False, height=False)
+        self.title("HRT")
+        self.img = PhotoImage(file='scheme.png')
+        scheme = Label(self, image=self.img)
+        scheme.place(x=0, y=0)
+        self.calibrated_force_value = StringVar()
+        self.calibrated_force_value.set('None')
+        self.x = 0
+        calibrated_force_label = Label(self, 
+            textvariable=self.calibrated_force_value,
+            anchor=S,
+            font=("sans-serif", 18),
+
+        ).place(x=400, y=125, anchor='center')
+
+
+        but1 = Button(self, text="blah",command=self.blah ).place(x=0,y=0)
+        but2 = Button(self, text="quit",command=self.quit ).place(x=50, y=10)
+    def blah(self):
+        self.calibrated_force_value.set("%.3f N"%(self.x))
+        self.x+=0.12
+

@@ -8,6 +8,7 @@ from HRT import stepper
 if __name__ == '__main__':
     # Initialization of LabJackU6 and stepper module
     lj= U6()
+    
 
     stpr = stepper(lj= lj)
     stpr.start()
@@ -16,6 +17,7 @@ if __name__ == '__main__':
     while True:
         cmd = input(">: ")
         if cmd == "stop":
+            stpr.cmd(cmd)
             break
         
         try:

@@ -20,7 +20,7 @@ class GUI(Tk):
             font=("sans-serif", 18),
 
         ).place(x=400, y=125, anchor='center')
-
+        self.winders = {}
 
 
         but1 = Button(self, text="blah",command=self.blah ).place(x=0,y=0)
@@ -28,6 +28,22 @@ class GUI(Tk):
     def blah(self):
         self.calibrated_force_value.set("%.3f N"%(self.x))
         self.x+=0.12
+
+class winder():
+    def winder(self, pos = 'mid'):
+        thiswinder = []
+        if pos == 'mid':
+            x = 400
+        elif pos == 'left':
+            x = 125
+        elif pos == 'right':
+            x = -125
+        else:
+            print("Wrong winer position")
+            return 1
+
+        
+            
 
 
 if __name__ == '__main__':
