@@ -4,16 +4,17 @@ Python3.8.6
 blablabla Tonda is the author :)
 """
 #Import the necessary libraries
-from threading import Thread
+from threading import Thread, Lock
 from queue import Queue
+
 # from labjack_unified.devices import LabJackU6
 from time import sleep
 from tkinter import *
 
 
-class stepper(Thread):
+class Stepper(Thread):
     # stepper is a thread, running a state machine
-    def __init__(self, lj, DO = [0, 1, 2, 3], delay = 0.000015, name = "Stepper"):
+    def __init__(self, lj, DO = [0, 1, 2, 3], delay = 0.000015, name = "Stepper", display= None):
         Thread.__init__(self) #thread initiation - must be started externaly by self.start()
 
         # set up variables
@@ -22,24 +23,21 @@ class stepper(Thread):
         self.DO = DO # Occupied pins - MUST BE IN RIGHT ORDER!
         self.delay = delay # DO switching interval in seconds
         self.name = name # every nice things has a name!
-        self.qu = Queue() # commands queue for state machine controll
+        self.lock = Lock() # lock for synchronization
+        self.lock.acquire() 
         self.x_set = 0 # required position
         self.x_cur = 0 # current 'home' position
-        
+        self.display = display
         # go to default motor state
         # change - to + for oposite direction at *
         for pin in range(4):
             pin = -pin # *
             # microstep
             self.lj.setDOState(self.DO[pin % 4], 1)
-            print("turn on pin", pin % 4)
             sleep(self.delay)
             self.lj.setDOState(self.DO[(pin - 1) % 4], 1) # *
-            print("turn on pin", (pin - 1) % 4) 
             sleep(self.delay)
-            self.lj.setDOState(self.DO[pin % 4], 0)
-            print("turn off pin", pin % 4)
-            
+            self.lj.setDOState(self.DO[pin % 4], 0)            
             sleep(self.delay)
         self.lj.setDOState(self.DO[0], 0)
         
@@ -48,7 +46,6 @@ class stepper(Thread):
     def zero(self): # set all pins to zero
         for pin in self.DO:
             self.lj.setDOState(pin, 0)
-            self.state = 'idle'
     
     def step(self, s = -1): # do step in direction s
         if s == 0:
@@ -65,50 +62,68 @@ class stepper(Thread):
                 sleep(self.delay)
 
             self.x_cur += s
-    
+            try:
+                self.display['x'].set(self.x_cur)
+            except:
+                pass
+
+
     def chase(self):
         # stepper will go to self.x_set
-        while self.state == "chase": # chase loop - can be externally stopped by changing state
-            # decide direction 
-            if self.x_set > self.x_cur:
-                s = 1
-            elif self.x_set < self.x_cur: 
-                s = -1
-            
-            if self.x_set == self.x_cur: # stepper is on x_set            
-                self.zero() # set all pins zero
-                print ("", end="\r")
-                print(self.name, "is at x =", self.x_cur) # report position / end of process
-                print(">:")
-                # leave chase loop and set state to "idle"
-                self.state = "idle"
-                break
-            else: # step towards x_set
-                self.step(s)
+        # decide direction 
+        if self.x_set > self.x_cur:
+            s = 1
+        elif self.x_set < self.x_cur: 
+            s = -1
+        
+        if self.x_set == self.x_cur: # stepper is on x_set            
+            self.zero() # set all pins zero
+        else: # step towards x_set
+            self.step(s)
 
     def run(self):
         # state machine of stepper thread
         while True:
-            self.state = self.qu.get() # waiting for new command in queue
-            sleep(0.2)
+
+            if self.state == "idle":
+                # self.qu.get() # waiting for new command in queue
+                self.lock.acquire()
 
             if self.state == "chase":          
                 self.chase()
-        
+            
+            elif self.state == "up":
+                self.step(1)
+            
+            elif self.state == "down":
+                self.step(-1)
+
             elif self.state == "stop": # with self.cmd exteption will stop cirrent process inside state machine
                 self.zero()
                 self.state = "idle"
 
             elif self.state == "kill": # kills the thread
+                self.zero()
                 print(self.name, "- stopped.")
                 break
+
+            else:
+                self.state = "stop"
+
+            # update state display
+            try:
+                self.display['state'].set(self.state)
+            except:
+                pass
 
     def cmd(self, cmd):
         # send cmd to queue
         if cmd != self.state:
-            self.qu.put(cmd)
-        # stop loops inside state machine
-        if cmd == "stop": self.state = "stop" # self.stop() is owned by Thread class
+            # self.qu.put(cmd)
+            if self.lock.locked():
+                self.lock.release()
+            self.state = cmd
+            
     
     def mv(self, d):
         # move ralatively
