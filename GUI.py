@@ -157,15 +157,22 @@ class Winder():
 
     def x_set_update(self, *args):
         try:
+            # in case that display['x_set'] is not declared
             self.stepper.x_set = int(self.display['x_set'].get())
         except:
             pass
+        if self.stepper.state == "chase" and self.stepper.lock.locked():
+            # when chase state reaches the x_set, the thread is locked 
+            # release the stepper lock for new x_set
+            self.stepper.lock.release()
 
     def set_all_off(self):
+        # set all buttons up
         self.plus_button.config(image= self.plus_up)
         self.minus_button.config(image= self.minus_up)
         self.chase_button.config(image= self.chase_up)
     
+    # button functions
     def plus(self):
         if self.stepper.state == "up":
             self.plus_button.config(image = self.plus_up)

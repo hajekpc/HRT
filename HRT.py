@@ -14,7 +14,7 @@ from tkinter import *
 
 class Stepper(Thread):
     # stepper is a thread, running a state machine
-    def __init__(self, lj, DO = [0, 1, 2, 3], delay = 0.000015, name = "Stepper", display= None):
+    def __init__(self, lj, DO = [0, 1, 2, 3], delay = 0.00025, name = "Stepper", display= None):
         Thread.__init__(self) #thread initiation - must be started externaly by self.start()
 
         # set up variables
@@ -78,6 +78,7 @@ class Stepper(Thread):
         
         if self.x_set == self.x_cur: # stepper is on x_set            
             self.zero() # set all pins zero
+            self.lock.acquire()
         else: # step towards x_set
             self.step(s)
 
