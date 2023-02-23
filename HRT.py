@@ -14,7 +14,7 @@ from tkinter import *
 
 class Stepper(Thread):
     # stepper is a thread, running a state machine
-    def __init__(self, lj, DO = [0, 1, 2, 3], delay = 0.00025, name = "Stepper", display= None):
+    def __init__(self, lj, DO = [0, 1, 2, 3], delay = 0.0005, name = "Stepper", display= None):
         Thread.__init__(self) #thread initiation - must be started externaly by self.start()
 
         # set up variables
