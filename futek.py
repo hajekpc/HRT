@@ -3,14 +3,15 @@ import numpy as np
 import pandas as pd
 from u6 import U6
 from datetime import datetime
+import os
 
+calibration_data0 = [   np.array([0, 20, 40, 60, 80, 100, 120, 140, 160, 180, 200]),
+                        np.array([-0.00012013985613362963, -0.0003329228642437037, -0.0005608490333823703, -0.0007933885404334814, -0.0010211578983465187, -0.0012503398049180739, -0.0014779138310955554, -0.0017170361346, -0.0019502189497622219, -0.002177925458422222, -0.0024032938345111107])
+                    ]
 calibration_data0 = [    np.linspace(0, 200, 21),
                         np.array([2.844225805542777e-05, 0.00014534961022150128, 0.00025365125494269947, 0.00037201920887985906, 0.00047609695119499307, 0.0006025771660795876, 0.0007256032552835912,  0.0008311218614998062, 0.0009558651446543998, 0.001067107730627459, 0.0011721131525015416, 0.0012797239721069609, 0.0014142374964736248, 0.0015108148514935138, 0.0016349265229753662, 0.001761584378592751, 0.0018642804707158511, 0.0019872078706759666, 0.002095884534875303, 0.002232095515302568, 0.002336568014825957]),
                         
                         ] # [weights, actual meassured voltages]
-calibration_data0 = [   np.array([0, 20, 40, 60, 80, 100, 120, 140, 160, 180, 200]),
-                        np.array([-0.00012013985613362963, -0.0003329228642437037, -0.0005608490333823703, -0.0007933885404334814, -0.0010211578983465187, -0.0012503398049180739, -0.0014779138310955554, -0.0017170361346, -0.0019502189497622219, -0.002177925458422222, -0.0024032938345111107])
-                    ]
 def getSample(lj, Ch_futek = 6, n_samples = 4000, config = True):
     ChOpt_futek = 0b10110000 # gain 1000 - range +/- 0.01 V, differential measurement 
     AIN_futek = []
@@ -53,30 +54,42 @@ def proceedCalibration(lj, Ch_futek = 6):
     pd.DataFrame(np.array([weight,u_calib]).transpose()).to_csv("calibration/Futek_calibration-%s.csv" %datetime.now().strftime("%d-%m-%Y-%H-%M-%S"),index_label="i", header=["Weight [g]","voltage [V]"])
 
 
+def getLastCalibration(appendix= "Futek"):
+    lastDatetime = datetime(1,1,1)    
+    for file in os.listdir("calibration/"):
+        if file.startswith(appendix):
+            currentDatetime = datetime.strptime(file[-23:-4], "%d-%m-%Y-%H-%M-%S")
+            if currentDatetime > lastDatetime:
+                lastDatetime = currentDatetime
+                lastFile = file
+    return lastFile
 
 
-def plotCalibration(calibration_data = None):
-    if calibration_data == None:
-        global calibration_data0
-        calibration_data = calibration_data0
-    weight = calibration_data[0]
-    calib = calibration_data[1]
-    plt.plot(weight, calib*1000, "x")
+def plotCalibration(CalibrationFile = None):
+    if CalibrationFile is None:
+        CalibrationFile = "calibration/" + getLastCalibration()
+    
+    # TODO raed file + read last calibration file when None
+    calibrationData = pd.read_csv(CalibrationFile)
 
-    calib_coef = np.polyfit(weight, calib, 1)
+    weight = calibrationData["W"]
+    voltage = calibrationData["V"]
+    plt.plot(weight, voltage*1000, "x")
+
+    calib_coef = np.polyfit(weight, voltage, 1)
     plt.plot([0, 200], np.polyval(calib_coef, [0, 200])*1000)
     plt.xlabel("Hmotnost závaží [g]")
     plt.ylabel("Výstupní napětí [mV]")
 
-    calib_coef = np.polyfit(calib, weight , 1) # g/V
-    print(calib_coef)
+    # calib_coef = np.polyfit(calib, weight , 1) # g/V
+    # print(calib_coef)
     plt.show()
 
 def getFutekForce(U, calib_coef = [-8.70612452e+04, -9.26333650e+00]):
     g = 0.00980665 # N/g
     return g*(np.polyval(calib_coef, U))
 
-def measLoop():
+def measLoop(): # this is just to try out reading
     lj = U6()
     n = 100
     GI = 4
@@ -98,6 +111,9 @@ def measLoop():
         F = getFutekForce(U1 - U0)
         print("Force =", F,"N")
 
+if __name__ == '__main__':
+
 # proceedCalibration(U6())
 # measLoop()
-# plotCalibration()
+    plotCalibration()
+# getLastCalibration()

@@ -1,8 +1,8 @@
 from u6 import U6
 from time import sleep
 lj = U6()
-
-
+def sample(Ch = 0):
+    print(lj.getAIN(Ch, differential= True))
 
 Rmean = 0
 n = 50
