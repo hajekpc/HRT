@@ -1,7 +1,7 @@
-from HRT import *
-if __name__ == '__main__':
+import json
 
-    # Add image file
-    
-    gui = GUI()
-    gui.mainloop()
+fCfg = open("cfg.json","r")
+Cfg = json.loads(fCfg.read())
+fCfg.close()
+
+print(Cfg.keys())

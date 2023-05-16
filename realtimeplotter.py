@@ -28,16 +28,17 @@ class calibPlotter():
         self.axF.set_ylim([0, 2])
         self.axF.set_xlabel("Time [s]")
         self.axF.set_ylabel("Force [N]", color= 'tab:red')
-        self.lF, = self.axF.plot(self.t, self.Ft, color= 'tab:red', marker= ".")
+        # self.lF, = self.axF.plot(self.t, self.Ft, color= 'tab:red', marker= ".")
 
         self.axx = self.axF.twinx()
         self.axx.set_ylim([-1, 10])
         self.axx.set_ylabel("Position [steps]", color= 'tab:blue')
-        self.lx, = self.axx.plot(self.t, self.x, color= 'tab:blue', marker= ".")
+        # self.lx, = self.axx.plot(self.t, self.x, color= 'tab:blue', marker= ".")
 
-        self.linesT = [self.lx, self.lF]
+        # self.linesT = [self.lx, self.lF]
+        self.linesT = []
 
-        plt.pause(0.2)
+        plt.pause(0.2)  
 
 
 
@@ -107,10 +108,13 @@ class calibPlotter():
         plt.pause(0.1)
 
     def newT(self):
-        plt.setp(self.lF, linestyle= ":")
-        plt.setp(self.lx, linestyle= ":")
+        try:
+            plt.setp(self.lF, linestyle= ":")
+            plt.setp(self.lx, linestyle= ":")
+        except:
+            pass
         # plt.setp(self.lx, "--")
-        plt.pause(0.1)
+        # plt.pause(0.1)
         self.t = []
         self.Ft = []
         self.x = []
@@ -124,7 +128,7 @@ class calibPlotter():
         try:
             for line in self.linesT:
                 line.remove()
-            plt.pause(0.1)
+            # plt.pause(0.1)
         except:
             pass
         self.linesT = []
@@ -140,7 +144,8 @@ class calibPlotter():
 
 if __name__ == '__main__':
     plotter = calibPlotter()
-
+    plotter.new()
+    plotter.newT()
     for i in range(2):
         for i in range(3):
             plotter.add(i/10 + random(), -0.0024 + (random()-0.5)/10000)
@@ -160,9 +165,9 @@ if __name__ == '__main__':
             plotter.add(i/10 + random(), -0.0024 + (random()-0.5)/10000)
 
 
-    for i in range(3):
+    for i in range(30):
         plotter.newT()
-        for i in range(3):
+        for i in range(5):
             plotter.addT(i/10, i/10 + random(), i*10 + randint(-5, 5))
 
     sleep(0.5)

@@ -88,7 +88,7 @@ class Stepper(Thread):
     def run(self):
         # state machine of stepper thread
         while True:
-
+            # print("Stepper state:", self.state)
             if self.state == "idle":
                 # self.qu.get() # waiting for new command in queue
                 self.lock.acquire()
