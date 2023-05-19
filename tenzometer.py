@@ -11,10 +11,10 @@ from threading import Thread
 from queue import Queue
 from scipy.stats import linregress
 import csv, json, os
-fCalib = open("cfg.json","r")
+fCalib = open("calib.json","r")
 calib = json.loads(fCalib.read())
 fCalib.close()
-p = calib["Futek"]
+p = calib["FutekL"]
 print(p)
 def getFutekForce(u):
     global p

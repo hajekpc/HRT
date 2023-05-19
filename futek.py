@@ -173,9 +173,11 @@ def saveCalibrationParameters(filename = None, prefix= "Futek"):
 
 if __name__ == '__main__':
     FutekName = "FutekL"
-    lj = U6()
-    proceedCalibration(lj, FutekName, 6)
+    # lj = U6()
+    # lj.getCalibrationData()
+
+    # proceedCalibration(lj, FutekName, 6)
     saveCalibrationParameters(prefix= FutekName)
-    lj.close()
+    # lj.close()
 
     # measStart()

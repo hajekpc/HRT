@@ -1,7 +1,5 @@
-d = {'a': 1, 'b': 2}
+from u6 import U6
 
-for e in d:
-    print(e)
-
-for e in d:
-    print(d[e])
+lj = U6()
+lj.setDOState(12,0)
+lj.close()

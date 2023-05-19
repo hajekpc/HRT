@@ -8,36 +8,36 @@ import sys, json, csv
 import numpy as np
 from datetime import datetime
 from simple_pid import PID
+from queue import Queue, Empty
 
 
 class HRT(Tk):
     def __init__(self, outFilePrefix = "Meas"):
         Tk.__init__(self)
         self.lj = U6()
-        # self.lj.reset()
-        # sleep(10)
         self.lj.getCalibrationData()
+        self.quit = False
+
         self.outFilePrefix = outFilePrefix
         self.outFile = None
+        self.outFile = open("data/%s-%s.csv" %(self.outFilePrefix, datetime.now().strftime("%d-%m-%Y-%H-%M-%S")), "w", newline='', encoding='utf-8')
+        self.writer = csv.writer(self.outFile) #, dialect= 'unix')
+        header = ["T", "FL", "FM", "FR", "xL", "xM", "xR"]
+        self.writer.writerow(header)
 
+        # Tk window settings
         self.geometry('800x600-0+0')
         self.resizable(width=False, height=False)
         self.title("HRT")
-        self.img = PhotoImage(file='gui/scheme.png')
         self.record_state = False
+
+        self.img = PhotoImage(file='gui/scheme.png')
         scheme = Label(self, image=self.img)
         scheme.place(x=0, y=0)
-        # self.calibrated_force_value = StringVar()
-        # self.calibrated_force_value.set('None')
-        # self.x = 0
-        # calibrated_force_label = Label(self, 
-        #     textvariable=self.calibrated_force_value,
-        #     anchor=S,
-        #     font=("sans-serif", 18),
-        #     bd=0,
+
+        # button for recording
         self.record_up = PhotoImage(file='gui/record_up.png')
         self.record_down = PhotoImage(file='gui/record_down.png')
-
         self.record_button = Button(
             self,
             image = self.record_up, 
@@ -53,182 +53,244 @@ class HRT(Tk):
             width= 48,
 
             )
+        self.Fval = DoubleVar(value= 0)
+        # self.display['x_set'].trace("w", self.x_set_update)
+
+        self.F_set_entry = Entry(
+            self,
+            textvariable= self.Fval,
+            font= ("Bauhaus 83", 28),
+            justify=CENTER,
+            borderwidth = 0,
+            highlightthickness= 0,
+
+        )
+        self.F_set_entry.bind("<Return>", self.sendF)
+        self.F_set_entry.place(
+            x= 100, 
+            y= 201,
+            anchor=S,
+            width=196,
+            height=48)
         
 
-        # ).place(x=400, y=125, anchor='center')
-        self.winder = (Winder(self, self.lj, 0, SensorName="Tenzo2" ), Winder(self, self.lj, 1, SensorName="Futek" ), Winder(self, self.lj, 2, SensorName="Tenzo1"))
-        self.lj.getFeedback(DAC0_8(self.lj.voltageToDACBits(5, dacNumber = 0, is16Bits = False))) # Set DAC0 to 5 V
-        self.lj.getFeedback(DAC1_8(self.lj.voltageToDACBits(5, dacNumber = 1, is16Bits = False))) # Set DAC1 to 5 V
-        # setting stream to obtain tenzometers values
-        # separate class might be created
-        
+        self.AINqueue = (Queue(), Queue(), Queue())
+        self.SensorName = ("FutekL", "FutekM", "FutekR") # sensor names that will be attached to stepper from left to right
+        self.side = ("L", "M", "R")
+        self.Ch = (6, 8, 10)
+        self.CalibPar = ()
 
-
-
-
-        self.initDAQ()
-    def record(self):
-        if self.record_state:
-            self.record_state = False
-            self.record_button.config(image= self.record_up)
-            self.outFile.close()
-            self.outFile = None
-        else:
-            self.record_button.config(image= self.record_down)
-            self.T0 = time()
-            self.outFile = open("data/%s-%s.csv" %(self.outFilePrefix, datetime.now().strftime("%d-%m-%Y-%H-%M-%S")), "w")
-            self.writer = csv.writer(self.outFile)
-            header = ["F", "T", "x", "side"]
-            self.writer.writerow(header)
-            self.record_state = True
-
-
-    def initDAQ(self, SensorNames = ["FutekL","FutekM","FutekR"], ChannelLeft = 6, ChannelMid = 8, ChannelRight = 10, ChannelComp = 0, WinderOrder = [0,1,2]):
-        self.ChannelLeft = ChannelLeft
-        self.ChannelMid = ChannelMid
-        self.ChannelRight = ChannelRight
-        self.ChannelComp = ChannelComp
-        fCalib = open("cfg.json","r")
+        fCalib = open("calib.json","r")
         calib = json.loads(fCalib.read())
         fCalib.close()
-        self.CalibrationParametersLeft = calib[SensorNames[0]]
-        self.CalibrationParametersMid = calib[SensorNames[1]]
-        self.CalibrationParametersRight = calib[SensorNames[2]]
-        ChOpt_tenzo = 0b10100000 # gain 100 -> range ~ +/- 0.1 V
-        ChOpt_futek = 0b10110000 # gain 1000 -> range ~ +/- 0.01 V
-        # for ResolutionIndex 8 and gain > 100 it need 11.3ms/channel/scan -> 22.1 Hz scan freq
-        self.lj.streamConfig(   NumChannels=3, ChannelNumbers= [ChannelLeft, ChannelMid, ChannelRight], 
-                                ChannelOptions= [ChOpt_futek, ChOpt_futek, ChOpt_futek], 
-                                ResolutionIndex=8, ScanFrequency= 27, InternalStreamClockFrequency= 1, SettlingFactor= 0,
+
+        # init winders
+        self.winder = ()
+        for i in range(3):
+            self.CalibPar += (calib[self.SensorName[i]],)
+            self.winder += (Winder(self, self.lj, pos= i, SensorName= self.SensorName[i], AINqueue= self.AINqueue[i]),)
+
+
+        self.lj.getFeedback(DAC0_8(self.lj.voltageToDACBits(5, dacNumber = 0, is16Bits = False))) # Set DAC0 to 5 V, i.e. FutekM excitation voltage
+        self.lj.getFeedback(DAC1_8(self.lj.voltageToDACBits(5, dacNumber = 1, is16Bits = False))) # Set DAC1 to 5 V, i.e. FutekR excitation voltage
+        # FutekL is connected to VS pin (~ 5V from USB)
+
+
+
+        self.ScanFrequency = 24 # for ResolutionIndex 8 and gain 1000 it need 11.3ms/channel/scan -> 29 Hz scan freq
+        self.syncOutLock = Lock()
+        self.syncOutLock.acquire()
+        self.DAQThread = Thread(target= self.DAQ)
+        self.DAQThread.start()
+        self.syncOutThread = Thread(target= self.syncOut)
+        self.syncOutThread.start()
+
+    def sendF(self, somepar):
+
+        self.winder[0].pid.setpoint = float(self.Fval.get())
+        self.winder[2].pid.setpoint = float(self.Fval.get())
+
+    def syncOut(self):
+
+        dT = 1/(self.ScanFrequency)/3 # = 0.012345679012345678
+        calibT = 0 # time to compensate DAQ and sinc clock shift
+        # trigger will produce rising edge for each taken sample... there are 3 channels being switched with multiplexer befor ADC... each shifted by dT from each other
+        while True:
+            if not self.record_state:
+                # wait until lock release
+                print("sync waiting")
+                self.syncOutLock.acquire()
+                T0 = time() - calibT # get new timing after lock release
+                print("sync started")
+                # time of first pulse is delayed by calibT
+
+            sleep(dT*0.45) # to not consume cpu 
+            if (time() - dT) >= T0:
+
+                self.lj.setDOState(12,1)
+                T0 = time()
+                sleep(dT/3) # pulse length
+                self.lj.setDOState(12,0)
+
+            if self.quit:
+                break
+
+            
+
+    def record(self):
+        if self.record_state:
+            self.syncOutLock.acquire()
+            self.record_state = False
+            self.record_button.config(image= self.record_up)
+
+        else:
+            self.record_state = True
+            self.record_button.config(image= self.record_down)
+
+
+    def DAQ(self):      
+        ChOpt_futek = [0b10110000] # gain 1000 -> range ~ +/- 0.01 V
+        self.lj.streamConfig(   NumChannels=3, ChannelNumbers= self.Ch, ChannelOptions= 3*ChOpt_futek, 
+                                ResolutionIndex=8, ScanFrequency= self.ScanFrequency, InternalStreamClockFrequency= 1, SettlingFactor= 0,
                             )
 
-        self.DAQThread = Thread(target= self.DAQloop)
-        self.DAQThread.start()
+        # Lpid = PID(7,4,5, setpoint=0, sample_time=0.3, output_limits=(0,20))
+        # Mpid = PID(7,4,5, setpoint=0, sample_time=0.3, output_limits=(0,20))
+        # Rpid = PID(7,4,5, setpoint=0, sample_time=0.3, output_limits=(0,20))
 
-    def DAQloop(self, WinderOrder = [0,1,2]):
-        L = "AIN%i" %self.ChannelLeft
-        M = "AIN%i" %self.ChannelMid
-        C = "AIN%i" %self.ChannelComp
-        R = "AIN%i" %self.ChannelRight
-
-        Lmax = 20
-        Mmax = 20
-        Rmax = 20
-
-        Lset = None
-        Mset = None
-        Rset = None
-
-        Lpid = PID(7,4,5, setpoint=0, sample_time=0.3, output_limits=(0,20))
-        Mpid = PID(7,4,5, setpoint=0, sample_time=0.3, output_limits=(0,20))
-        Rpid = PID(7,4,5, setpoint=0, sample_time=0.3, output_limits=(0,20))
-        
-        Lfilo = []
-        Mfilo = []
-        Rfilo = []
-
-        Cout = 0        
-        
-
+        # start AIN streaming
         try:
             self.lj.streamStart()
         except:
+            # in case of already stream stream 
             self.lj.streamStop()
             self.lj.streamStart()
-        # tenzometer zeroing
-        # for r in self.lj.streamData():
-        #     if r is not None:
-        #         Lfilo += r[L]
-        #         Rfilo += r[R]
-        #         if len(Rfilo) > 500 and len(Lfilo) > 500:
-        #             Lforce0 = np.mean(Lfilo)*self.CalibrationParametersLeft[1] + self.CalibrationParametersLeft[0]
-        #             Rforce0 = np.mean(Rfilo)*self.CalibrationParametersRight[1] + self.CalibrationParametersRight[0]
-        #             print("L0 =", Lforce0, "N")
-        #             print("R0 =", Rforce0, "N")
-        #             Lfilo = []
-        #             Rfilo = []
-        #             break
 
+        self.T0 = time()
+        ChannelData = [[], [], []]
+        # AIN acquisition loop
         for r in self.lj.streamData():
             if r is not None:
-                Lfilo += r[L]
-                Mfilo += r[M]
-                Rfilo += r[R]
+                if self.record_state and self.syncOutLock.locked():
+                    # start out clock immediately after acquiring the first sample
+                    self.syncOutLock.release()
+
+                for i in range(3):
+                    ChannelData[i] = (np.array(r["AIN%i" %self.Ch[i]])*self.CalibPar[i][1] + self.CalibPar[i][0]).tolist() # get data for specific AIN
+                    self.AINqueue[i].put(ChannelData[i]) # send data to queue
+
                 if self.record_state:
-                    T = time() - self.T0
+                    self.writer.writerow([time() - self.T0] + ChannelData + [self.winder[0].stepper.x_cur, self.winder[1].stepper.x_cur, self.winder[2].stepper.x_cur])
 
-                    for u in r[L]:
-                        F = self.CalibrationParametersLeft[1]*u + self.CalibrationParametersLeft[0]
-                        self.writer.writerow([F, T, self.winder[WinderOrder[0]].stepper.x_cur, "L"])
-                    for u in r[M]:
-                        F = self.CalibrationParametersMid[1]*u + self.CalibrationParametersMid[0]
-                        self.writer.writerow([F, T, self.winder[WinderOrder[1]].stepper.x_cur, "M"])
-                    for u in r[R]:
-                        F = self.CalibrationParametersRight[1]*u + self.CalibrationParametersRight[0]
-                        self.writer.writerow([F, T, self.winder[WinderOrder[2]].stepper.x_cur, "R"])
+            if self.quit:
+                print("Terminating DAQ thread")
+                self.lj.streamStop()
+                self.outFile.close()
+                return
+                        
+            # if len(Lfilo) > Lmax:
+            #     Lfilo = Lfilo[-Lmax:]
+            #     Lout = np.mean(Lfilo)
+            #     Lforce = self.CalibrationParametersLeft[1]*Lout + self.CalibrationParametersLeft[0]
+            #     try:
+            #         self.winder[WinderOrder[0]].display["F"].set("%1.2f N" %Lforce)
+            #     except:
+            #         pass
+            #     if self.winder[WinderOrder[0]].PIDstate:
+            #         if self.winder[WinderOrder[0]].stepper.state == "idle":
+            #             Lpid.setpoint = self.winder[WinderOrder[0]].F_set                        
+            #             Lpidval = Lpid(Lforce)
+            #             self.winder[WinderOrder[0]].stepper.goto(int(Lpidval))
+            #             Lpid.output_limits = (Lpidval-20, Lpidval+20)
+    def exit(self):
+        self.quit = True
+        for winder in self.winder:
+            winder.stepper.cmd("kill") # kills stepper controll thread
+            winder.quit = True # kills readout thread after queue timeout
 
-            if len(Lfilo) > Lmax:
-                Lfilo = Lfilo[-Lmax:]
-                Lout = np.mean(Lfilo)
-                Lforce = self.CalibrationParametersLeft[1]*Lout + self.CalibrationParametersLeft[0]
-                try:
-                    self.winder[WinderOrder[0]].display["F"].set("%1.2f N" %Lforce)
-                except:
-                    pass
-                if self.winder[WinderOrder[0]].PIDstate:
-                    if self.winder[WinderOrder[0]].stepper.state == "idle":
-                        Lpid.setpoint = self.winder[WinderOrder[0]].F_set                        
-                        Lpidval = Lpid(Lforce)
-                        self.winder[WinderOrder[0]].stepper.goto(int(Lpidval))
-                        Lpid.output_limits = (Lpidval-20, Lpidval+20)
-
-            if len(Mfilo) > Mmax:
-                Mfilo = Mfilo[-Mmax:]
-                Mout = np.mean(Mfilo)
-                Mforce = self.CalibrationParametersMid[1]*Mout + self.CalibrationParametersMid[0]
-                try:
-                    self.winder[WinderOrder[1]].display["F"].set("%1.2f N" %Mforce)
-                except:
-                    pass
-                if self.winder[WinderOrder[1]].PIDstate:
-                    if self.winder[WinderOrder[1]].stepper.state == "idle":
-                        Mpid.setpoint = self.winder[WinderOrder[1]].F_set                        
-                        Mpidval = Mpid(Mforce)
-                        self.winder[WinderOrder[1]].stepper.goto(int(Mpidval))
-                        Mpid.output_limits = (Mpidval-20, Mpidval+20)
-
-            if len(Rfilo) > Rmax:
-                Rfilo = Rfilo[-Rmax:]
-                Rout = np.mean(Rfilo)
-                Rforce = self.CalibrationParametersRight[1]*Rout + self.CalibrationParametersRight[0]
-                try:
-                    self.winder[WinderOrder[2]].display["F"].set("%1.2f N" %Rforce)
-                except:
-                    pass
-                if self.winder[WinderOrder[2]].PIDstate:
-                    if self.winder[WinderOrder[2]].stepper.state == "idle":
-                        Rpid.setpoint = self.winder[WinderOrder[2]].F_set                        
-                        Rpidval = Rpid(Rforce)
-                        self.winder[WinderOrder[2]].stepper.goto(int(Rpidval))
-                        Rpid.output_limits = (Rpidval-20, Rpidval+20)
+        if self.syncOutLock.locked():
+            self.syncOutLock.release()
 
 class Winder():
     global Font
-    def __init__(self, gui, lj, pos = 0, SensorName = "Tenzo2"):
+    def __init__(self, gui, lj, pos, SensorName, AINqueue):
         # create GUI
 
         # constants for layout at gui and LabJack digital pins
         x_positions = [203, 403, 603]
-        stepper_pins = [[8, 9, 10, 11], [7, 6, 5, 4], [0, 1, 2, 3]]
-        self.PIDstate = False
+        stepper_pins = [[8, 9, 10, 11], [7, 6, 5, 4], [0, 1, 2, 3]] # stepper pins, order of pins defines the direction of the rotation
+        self.PIDrun = False
         self.F_set = 0
-        y = 101
         x = x_positions[pos] # this x is for positions at gui
         self.display = {}
+        self.quit = False
 
         # initialize physiccal stepper ;)
         self.stepper = Stepper(lj, DO= stepper_pins[pos], display=self.display, delay= 0.001)
-        
+        self.DataProcThread = Thread(target=self.dataproc, args= [AINqueue])
+
+        self.castGui(gui, x)
+        self.DataProcThread.start()
+
+    def dataproc(self, AINqueue):
+        self.pid = PID(7,10,2, setpoint=0, sample_time=0.3)
+        self.pid.auto_mode = False
+        self.PIDstate = "idle"
+        F_offset = 0.2
+        while True:
+            try:
+                F = AINqueue.get(timeout= 1.5)
+                Fmean = np.mean(F)
+                try:
+                    self.display["F"].set("%1.3f N" %Fmean)
+                except:
+                    pass # gui is not initialized or it is killed
+
+                if self.PIDrun:
+                    print(self.PIDstate, self.F_set)
+                    print(self.stepper.x_cur, self.stepper.x_set)
+                    # pid.setpoint = self.F_set
+                    if self.PIDstate == "init":
+                        direction = np.sign(self.F_set - Fmean)
+                        self.PIDstate = "ramping"
+                    if self.PIDstate == "ramping":
+                        if direction*Fmean > direction*abs(self.F_set - F_offset):
+                            self.PIDstate = "run"
+                            self.pid.set_auto_mode(True, self.stepper.x_cur)
+                            self.pid.output_limits = (self.stepper.x_set - 2, self.stepper.x_set + 2)
+                        elif abs(self.stepper.x_cur - self.stepper.x_set) <= 7:
+                            self.stepper.mv(direction*10)
+                    if self.PIDstate == "run" and abs(self.stepper.x_cur - self.stepper.x_set) <= 4:
+                        pidVal = int(self.pid(Fmean))
+                        self.stepper.goto(pidVal)
+                        self.pid.output_limits = (pidVal - 20, pidVal + 20)
+
+                elif self.PIDstate == "stop":
+                    self.pid.auto_mode = False
+                    self.PIDstate = "idle"
+
+            except Empty:
+                if self.quit:
+                    break
+            # if len(Lfilo) > Lmax:
+            #     Lfilo = Lfilo[-Lmax:]
+            #     Lout = np.mean(Lfilo)
+            #     Lforce = self.CalibrationParametersLeft[1]*Lout + self.CalibrationParametersLeft[0]
+            #     try:
+            #         self.winder[WinderOrder[0]].display["F"].set("%1.2f N" %Lforce)
+            #     except:
+            #         pass
+            #     if self.winder[WinderOrder[0]].PIDstate:
+            #         if self.winder[WinderOrder[0]].stepper.state == "idle":
+            #             Lpid.setpoint = self.winder[WinderOrder[0]].F_set                        
+            #             Lpidval = Lpid(Lforce)
+            #             self.winder[WinderOrder[0]].stepper.goto(int(Lpidval))
+            #             Lpid.output_limits = (Lpidval-20, Lpidval+20)
+
+    def castGui(self, gui, x):
+
+        y = 101
+
         # initialize tk objects
         """ ROW 1 
         State display
@@ -401,12 +463,14 @@ class Winder():
 
     def F_set_update(self, *args):
         self.F_set = self.display["F_set"].get()
+        self.pid.setpoint = self.F_set
+    
     def set_all_off(self):
         # set all buttons up
         self.plus_button.config(image= self.plus_up)
         self.minus_button.config(image= self.minus_up)
         self.PID_button.config(image= self.PID_up)
-        self.PIDstate = False
+        self.PIDrun = False
     
     # button functions
     def plus(self):
@@ -435,24 +499,23 @@ class Winder():
                 self.stepper.cmd("chase")
         except:
             pass
-    def PID(self):
-        if self.PIDstate:      
-            self.PID_button.config(image = self.PID_up)
-            self.PIDstate = False
 
-            
+    def PID(self):
+        if self.PIDrun:      
+            self.PID_button.config(image = self.PID_up)
+            self.PIDstate = "stop"
+            self.PIDrun = False
+
         else:
             self.set_all_off()
             self.stepper.cmd("stop")
             self.PID_button.config(image = self.PID_down)
-            self.PIDstate = True
-            
-
-
-
+            self.PIDstate = "init"
+            self.PIDrun = True
 
 if __name__ == '__main__':
     hrt = HRT()
     hrt.mainloop()
+    hrt.exit()
     sys.exit()
     
