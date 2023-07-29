@@ -40,7 +40,7 @@
      inkscape:document-units="px"
      showgrid="true"
      inkscape:zoom="0.88830289"
-     inkscape:cx="261.73505"
+     inkscape:cx="81.616305"
      inkscape:cy="210.51378"
      inkscape:window-width="1920"
      inkscape:window-height="1011"
@@ -235,6 +235,22 @@
            style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:3.73333px;font-family:'Bauhaus 93';-inkscape-font-specification:'Bauhaus 93, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;stroke-width:0"
            x="69.975922"
            y="23.557362">Right</tspan></text>
+      <text
+         xml:space="preserve"
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:1.8px;font-family:'Bauhaus 93';-inkscape-font-specification:'Bauhaus 93, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;text-align:center;text-anchor:middle;fill:#000000;stroke:#000000;stroke-width:0;stroke-dasharray:none"
+         x="10.730055"
+         y="21.90736"
+         id="text325"><tspan
+           sodipodi:role="line"
+           id="tspan323"
+           style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:1.8px;font-family:'Bauhaus 93';-inkscape-font-specification:'Bauhaus 93, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;stroke-width:0;stroke-dasharray:none"
+           x="10.730055"
+           y="21.90736">Stepper</tspan><tspan
+           sodipodi:role="line"
+           style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:1.8px;font-family:'Bauhaus 93';-inkscape-font-specification:'Bauhaus 93, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;stroke-width:0;stroke-dasharray:none"
+           x="10.730055"
+           y="24.90736"
+           id="tspan429">position</tspan></text>
     </g>
   </g>
 </svg>
