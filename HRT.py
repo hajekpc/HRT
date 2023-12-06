@@ -1,7 +1,7 @@
 from tkinter import *
 from stepper import Stepper
 from u6 import U6, DAC0_8, DAC1_8
-from threading import Thread, Lock
+from threading import Thread, Lock  
 from time import sleep, time
 from queue import Queue
 import sys, json, csv
@@ -14,10 +14,13 @@ from queue import Queue, Empty
 class HRT(Tk):
     def __init__(self, outFilePrefix = "Meas"):
         Tk.__init__(self)
+        # init LabJack (LJ)
         self.lj = U6()
         self.lj.getCalibrationData()
+        # LJ processes kill variable :)
         self.quit = False
 
+        # init output file
         self.outFilePrefix = outFilePrefix
         self.outFile = None
         self.outFile = open("data/%s-%s.csv" %(self.outFilePrefix, datetime.now().strftime("%d-%m-%Y-%H-%M-%S")), "w", newline='', encoding='utf-8')
@@ -26,77 +29,61 @@ class HRT(Tk):
         self.writer.writerow(header)
 
         # Tk window settings
-        self.geometry('800x600-0+0')
+        self.geometry('800x400-0+0')
         self.resizable(width=False, height=False)
         self.title("HRT")
-        self.record_state = False
-
         self.img = PhotoImage(file='gui/scheme.png')
+
         scheme = Label(self, image=self.img)
         scheme.place(x=0, y=0)
-
-        # button for recording
-        self.record_up = PhotoImage(file='gui/record_up.png')
-        self.record_down = PhotoImage(file='gui/record_down.png')
-        self.record_button = Button(
-            self,
-            image = self.record_up, 
-            command = self.record,
-            borderwidth = 0,
-            highlightthickness= 0,
-            )
-        self.record_button.place(
-            x= 50, 
-            y= 101,
-            anchor= SW,
-            height= 48,
-            width= 48,
-
-            )
-        self.Fval = DoubleVar(value= 0)
+        self.castGui()
+            
+        # self.Fval = DoubleVar(value= 0)
         # self.display['x_set'].trace("w", self.x_set_update)
 
-        self.F_set_entry = Entry(
-            self,
-            textvariable= self.Fval,
-            font= ("Bauhaus 83", 28),
-            justify=CENTER,
-            borderwidth = 0,
-            highlightthickness= 0,
+        # self.F_set_entry = Entry(
+        #     self,
+        #     textvariable= self.Fval,
+        #     font= ("Bauhaus 83", 28),
+        #     justify=CENTER,
+        #     borderwidth = 0,
+        #     highlightthickness= 0,
 
-        )
-        self.F_set_entry.bind("<Return>", self.sendF)
-        self.F_set_entry.place(
-            x= 100, 
-            y= 201,
-            anchor=S,
-            width=196,
-            height=48)
+        # )
+        # self.F_set_entry.bind("<Return>", self.sendF)
+        # self.F_set_entry.place(
+        #     x= 100, 
+        #     y= 200,
+        #     anchor=S,
+        #     width=198,
+        #     height=48)
         
-
+        # init buffers 
         self.AINqueue = (Queue(), Queue(), Queue())
+        
+        # load calibration
         self.SensorName = ("FutekL", "FutekM", "FutekR") # sensor names that will be attached to stepper from left to right
         self.side = ("L", "M", "R")
-        self.Ch = (6, 8, 10)
+        self.Ch = (6, 8, 10) # LJ analog channels!
         self.CalibPar = ()
-
         fCalib = open("calib.json","r")
         calib = json.loads(fCalib.read())
         fCalib.close()
 
-        # init winders
+        # init winders, left is first
         self.winder = ()
         for i in range(3):
             self.CalibPar += (calib[self.SensorName[i]],)
             self.winder += (Winder(self, self.lj, pos= i, SensorName= self.SensorName[i], AINqueue= self.AINqueue[i]),)
 
-
+        # turn on Futek excitation voltage for internal wheatson bridge circuit
         self.lj.getFeedback(DAC0_8(self.lj.voltageToDACBits(5, dacNumber = 0, is16Bits = False))) # Set DAC0 to 5 V, i.e. FutekM excitation voltage
         self.lj.getFeedback(DAC1_8(self.lj.voltageToDACBits(5, dacNumber = 1, is16Bits = False))) # Set DAC1 to 5 V, i.e. FutekR excitation voltage
         # FutekL is connected to VS pin (~ 5V from USB)
 
 
 
+        # init DAQ
         self.ScanFrequency = 24 # for ResolutionIndex 8 and gain 1000 it need 11.3ms/channel/scan -> 29 Hz scan freq
         self.syncOutLock = Lock()
         self.syncOutLock.acquire()
@@ -136,6 +123,46 @@ class HRT(Tk):
                 break
 
             
+    def castGui(self):
+        # recording button
+        self.record_state = False
+        self.record_up = PhotoImage(file='gui/record_up.png')
+        self.record_down = PhotoImage(file='gui/record_down.png')
+        self.record_button = Button(
+            self,
+            image = self.record_up, 
+            command = self.record,
+            borderwidth = 0,
+            highlightthickness= 0,
+            )
+        self.record_button.place(
+            x= 152, 
+            y= 400,
+            anchor= SW,
+            height= 48,
+            width= 48,
+
+            )
+
+        # entangle button 
+        self.entangle_state = False
+        self.entangle_up = PhotoImage(file='gui/entangle_up.png')
+        self.entangle_down = PhotoImage(file='gui/entangle_down.png')
+        self.entangle_button = Button(
+            self,
+            image = self.entangle_up, 
+            command = self.entangle,
+            borderwidth = 0,
+            highlightthickness= 0,
+            )
+        self.entangle_button.place(
+            x= 402, 
+            y= 400,
+            anchor= SW,
+            height= 48,
+            width= 198,
+
+            )
 
     def record(self):
         if self.record_state:
@@ -146,7 +173,16 @@ class HRT(Tk):
         else:
             self.record_state = True
             self.record_button.config(image= self.record_down)
+    
+    def entangle(self):
+        if self.entangle_state:
+            self.entangle_state = False
+            self.entangle_button.config(image= self.entangle_up)
+            self.winder[2].F_set = self.winder[0].F_set
 
+        else:
+            self.entangle_state = True
+            self.entangle_button.config(image= self.entangle_down)
 
     def DAQ(self):      
         ChOpt_futek = [0b10110000] # gain 1000 -> range ~ +/- 0.01 V
@@ -174,7 +210,7 @@ class HRT(Tk):
                 if self.record_state and self.syncOutLock.locked():
                     # start out clock immediately after acquiring the first sample
                     self.syncOutLock.release()
-
+                
                 for i in range(3):
                     ChannelData[i] = (np.array(r["AIN%i" %self.Ch[i]])*self.CalibPar[i][1] + self.CalibPar[i][0]).tolist() # get data for specific AIN
                     self.AINqueue[i].put(ChannelData[i]) # send data to queue
@@ -214,25 +250,28 @@ class HRT(Tk):
 class Winder():
     global Font
     def __init__(self, gui, lj, pos, SensorName, AINqueue):
-        # create GUI
 
-        # constants for layout at gui and LabJack digital pins
-        x_positions = [203, 403, 603]
-        stepper_pins = [[8, 9, 10, 11], [7, 6, 5, 4], [0, 1, 2, 3]] # stepper pins, order of pins defines the direction of the rotation
+        
+        # LJ DIO pins! pins, order of pins defines the direction of the rotation (### IMPORTANT FOR PID !!!
+        
+        stepper_pins = [[8, 9, 10, 11], [7, 6, 5, 4], [0, 1, 2, 3]] 
         self.PIDrun = False
-        self.F_set = 0
+        self.F_set = 0 # default force to PID
+        self.display = {} # tk variable continer
+        self.quit = False # thread kill variable
+
+        # constants for layout at gui
+        x_positions = [200, 400, 600]
         x = x_positions[pos] # this x is for positions at gui
-        self.display = {}
-        self.quit = False
-
-        # initialize physiccal stepper ;)
-        self.stepper = Stepper(lj, DO= stepper_pins[pos], display=self.display, delay= 0.001)
-        self.DataProcThread = Thread(target=self.dataproc, args= [AINqueue])
-
         self.castGui(gui, x)
-        self.DataProcThread.start()
+        # init stepper
+        self.stepper = Stepper(lj, DO= stepper_pins[pos], display=self.display, delay= 0.001)
+        # init and start PID thread
+        self.PIDProcThread = Thread(target=self.PIDProc, args= [AINqueue])
+        self.PIDProcThread.start()
 
-    def dataproc(self, AINqueue):
+    # PID state machine
+    def PIDProc(self, AINqueue):
         self.pid = PID(7,10,2, setpoint=0, sample_time=0.3)
         self.pid.auto_mode = False
         self.PIDstate = "idle"
@@ -245,14 +284,14 @@ class Winder():
                     self.display["F"].set("%1.3f N" %Fmean)
                 except:
                     pass # gui is not initialized or it is killed
-
+                
+                # this follows STATE MACHINE PATTERN!
                 if self.PIDrun:
-                    print(self.PIDstate, self.F_set)
-                    print(self.stepper.x_cur, self.stepper.x_set)
-                    # pid.setpoint = self.F_set
+
                     if self.PIDstate == "init":
                         direction = np.sign(self.F_set - Fmean)
                         self.PIDstate = "ramping"
+                    
                     if self.PIDstate == "ramping":
                         if direction*Fmean > direction*abs(self.F_set - F_offset):
                             self.PIDstate = "run"
@@ -289,7 +328,7 @@ class Winder():
 
     def castGui(self, gui, x):
 
-        y = 101
+        y = 100
 
         # initialize tk objects
         """ ROW 1 
@@ -298,14 +337,15 @@ class Winder():
         self.display['state'] = StringVar(value= "init")
         state_label = Label(
             gui,
+
             textvariable = self.display['state'],
-            font= ("Bauhaus 83", 26),
+            font= ("Bauhaus 83", 20),
         ).place(
             x= x + 100, 
             y= y,
             anchor=S,
             width=100,
-            height=46,
+            height=48,
         )
 
         """ ROW 2
@@ -321,13 +361,13 @@ class Winder():
         Label(
             gui,
             textvariable= self.display['x'],
-            font= ("Bauhaus 83", 28),
+            font= ("Bauhaus 83", 20),
             ).place(
-            x= x + 100, 
+            x= x + 100,
             y= y,
             anchor=S,
             width=100,
-            height=46
+            height=48
             )
         self.minus_button = Button(
             gui, 
@@ -337,7 +377,7 @@ class Winder():
             highlightthickness= 0,
             )
         self.minus_button.place(
-            x= x, 
+            x= x+2, 
             y= y,
             anchor= SW,
             height= 48,
@@ -371,7 +411,7 @@ class Winder():
         self.x_set_entry = Entry(
             gui,
             textvariable= self.display['x_set'],
-            font= ("Bauhaus 83", 28),
+            font= ("Bauhaus 83", 20),
             justify=CENTER,
             borderwidth = 0,
             highlightthickness= 0,
@@ -379,7 +419,7 @@ class Winder():
         )
         self.x_set_entry.bind("<Return>", self.chase)
         self.x_set_entry.place(
-            x= x + 99, 
+            x= x + 101, 
             y= y,
             anchor=S,
             width=198,
@@ -394,13 +434,13 @@ class Winder():
         Label(
             gui,
             textvariable= self.display["F"],
-            font= ("Bauhaus 83", 28),
+            font= ("Bauhaus 83", 20),
             ).place(
-            x= x + 100, 
+            x= x + 101, 
             y= y,
             anchor=S,
             width=180,
-            height=46
+            height=48
             )
         """ ROW 5
         F_set        
@@ -411,7 +451,7 @@ class Winder():
         self.F_set_entry = Entry(
             gui,
             textvariable= self.display['F_set'],
-            font= ("Bauhaus 83", 28),
+            font= ("Bauhaus 83", 20),
             justify=CENTER,
             borderwidth = 0,
             highlightthickness= 0,
@@ -420,7 +460,7 @@ class Winder():
 
         self.F_set_entry.bind("<Return>", self.F_set_update)
         self.F_set_entry.place(
-            x= x + 99, 
+            x= x + 101, 
             y= y,
             anchor=S,
             width=198,
@@ -442,7 +482,7 @@ class Winder():
             highlightthickness= 0,
             )
         self.PID_button.place(
-            x= x, 
+            x= x+2, 
             y= y,
             anchor= SW,
             height= 48,
