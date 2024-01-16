@@ -75,7 +75,6 @@ class HRT(Tk):
         for i in range(3):
             self.CalibPar += (calib[self.SensorName[i]],)
             self.winder += (Winder(self, self.lj, pos= i, SensorName= self.SensorName[i], AINqueue= self.AINqueue[i]),)
-
         # turn on Futek excitation voltage for internal wheatson bridge circuit
         self.lj.getFeedback(DAC0_8(self.lj.voltageToDACBits(5, dacNumber = 0, is16Bits = False))) # Set DAC0 to 5 V, i.e. FutekM excitation voltage
         self.lj.getFeedback(DAC1_8(self.lj.voltageToDACBits(5, dacNumber = 1, is16Bits = False))) # Set DAC1 to 5 V, i.e. FutekR excitation voltage
@@ -175,14 +174,20 @@ class HRT(Tk):
             self.record_button.config(image= self.record_down)
     
     def entangle(self):
+        # set entangle off
         if self.entangle_state:
             self.entangle_state = False
             self.entangle_button.config(image= self.entangle_up)
-            self.winder[2].F_set = self.winder[0].F_set
+            self.winder[0].entagled_winder = None
+            self.winder[2].entagled_winder = None
 
+        # set entangle on
         else:
             self.entangle_state = True
             self.entangle_button.config(image= self.entangle_down)
+            self.winder[0].entagled_winder = self.winder[2]
+            self.winder[2].entagled_winder = self.winder[0]
+
 
     def DAQ(self):      
         ChOpt_futek = [0b10110000] # gain 1000 -> range ~ +/- 0.01 V
@@ -253,7 +258,7 @@ class Winder():
 
         
         # LJ DIO pins! pins, order of pins defines the direction of the rotation (### IMPORTANT FOR PID !!!
-        
+        self.entagled_winder = None
         stepper_pins = [[8, 9, 10, 11], [7, 6, 5, 4], [0, 1, 2, 3]] 
         self.PIDrun = False
         self.F_set = 0 # default force to PID
@@ -501,17 +506,6 @@ class Winder():
             # release the stepper lock for new x_set
             self.stepper.lock.release()
 
-    def F_set_update(self, *args):
-        self.F_set = self.display["F_set"].get()
-        self.pid.setpoint = self.F_set
-    
-    def set_all_off(self):
-        # set all buttons up
-        self.plus_button.config(image= self.plus_up)
-        self.minus_button.config(image= self.minus_up)
-        self.PID_button.config(image= self.PID_up)
-        self.PIDrun = False
-    
     # button functions
     def plus(self):
         if self.stepper.state == "up":
@@ -530,6 +524,7 @@ class Winder():
             self.set_all_off()
             self.minus_button.config(image = self.minus_down)
             self.stepper.cmd("down")
+
     def chase(self, source = None):
         try:
             x_set = int(self.display['x_set'].get())
@@ -540,7 +535,7 @@ class Winder():
         except:
             pass
 
-    def PID(self):
+    def PID(self, native = True):
         if self.PIDrun:      
             self.PID_button.config(image = self.PID_up)
             self.PIDstate = "stop"
@@ -552,6 +547,26 @@ class Winder():
             self.PID_button.config(image = self.PID_down)
             self.PIDstate = "init"
             self.PIDrun = True
+
+        if self.entagled_winder and native:
+            self.entagled_winder.PID(False)
+    
+    def F_set_update(self, native = True, *args):
+        self.F_set = self.display["F_set"].get()
+        self.pid.setpoint = self.F_set
+
+        if self.entagled_winder and native:
+            # self.entagled_winder.F_set = self.F_set
+            self.entagled_winder.display["F_set"].set(self.F_set)
+            self.entagled_winder.F_set_update(native = False)
+    
+    def set_all_off(self):
+        # set all buttons up
+        self.plus_button.config(image= self.plus_up)
+        self.minus_button.config(image= self.minus_up)
+        self.PID_button.config(image= self.PID_up)
+        self.PIDrun = False
+    
 
 if __name__ == '__main__':
     hrt = HRT()
