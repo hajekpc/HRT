@@ -9,6 +9,7 @@ But big credits also becomes to:
  - Petr Hájek: petr.hajek@upol.cz
  - Hugo Lehoux: hugo.lehoux@upol.cz
 
+![Experimental Setup](img/setup.jpg)
 ## Desctiprion
 The project is written in Python 3.xx solely for Linux operating system as the Windows does not suppor the used multithreading (iOS was not tested).
 
@@ -47,7 +48,3 @@ The following application window should pop up:
 This user interface allows to controll each of the stepper motors in two regimes:
 1. steps - stepper motors can be set to wind or unwind with +/- buttons, or sent to specific position (relative to one default one which is set to 0 at program initialization)
 2. PID - stepper motors are automatically controlled with PID loot to achieve specific force. To use, write te force into Set force entry and confirm by pressing <enter\>. After that the Toggle PID button can be pressed and motor will automatically chase the defined position. To controll the left and right winder simultaneously (i.e. almost symetrically), togle the Entangle button. But make sure that for each of the two, some force was set before a (just by clicking into force entry and pressing <enter\>) and both PID buttons are switched off.
-
-
-
-![Experimental Setup](img/setup.jpg)
