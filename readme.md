@@ -33,9 +33,9 @@ Please make sure to install these modules before running the project.
 To calibrate the forcemeter the script [futek.py](futek.py) is used.
 Based on position of the forcemeter, use:
 
-- `python3 futek l` to calibrate left winder
-- `python3 futek m` to calibrate middle winder
-- `python3 futek r` to calibrate right winder
+- `python3 futek.py l` to calibrate left winder
+- `python3 futek.py m` to calibrate middle winder
+- `python3 futek.py r` to calibrate right winder
 
 Before starting the calibration process, make sure there is no load on the forcemeter and leave it hanging. When the calibration process is started, data for no force are taken so make sure to not affect the masurement. After that, the program asks for calibration weight (in grams) which should be hanged under the forcemeter. This can be done for multiple weight values. When sufficient amount of calibration points is taken, type `stop` instead the weight and program will automatically fit the calibration points with line and save it's parameters to file [calib.json](calib.json). When starting the main controll program, the calibration parameters are loaded automatically.
 
