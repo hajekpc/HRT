@@ -1,7 +1,7 @@
 # HRT
 This project was developed as an enhancement to an existing experimental setup to study a voice production at excised larynx specimens. This experiment is based at voice research laboratory which is part of experimental physics department at Palacky University in Olomouc. 
 
- - The voice research lab and the experiment is led by Jan Švec: jan.svec@upol.cz
+ - The Voice Research Rab and the experiment is led by Jan Švec: jan.svec@upol.cz
  - The project author is Antonín Lindner: antonin.lindner01@upol.cz 
  
 But big credits also becomes to:
@@ -11,7 +11,7 @@ But big credits also becomes to:
 
 ![Experimental Setup](img/setup.jpg)
 ## Desctiprion
-The project is written in Python 3.xx solely for Linux operating system as the Windows does not suppor the used multithreading (iOS was not tested).
+The project is written in Python 3.xx solely for Linux operating system as the Windows does not support the used multithreading (iOS was not tested).
 
 ## Python Modules Used
 Here is the list of Python modules used in this project:
@@ -45,6 +45,10 @@ To start the main application with GUI run:
 
 The following application window should pop up:
 ![GUI](img/gui.png)
-This user interface allows to controll each of the stepper motors in two regimes:
+This user interface allows to control each of the stepper motors in two regimes:
 1. steps - stepper motors can be set to wind or unwind with +/- buttons, or sent to specific position (relative to one default one which is set to 0 at program initialization)
 2. PID - stepper motors are automatically controlled with PID loot to achieve specific force. To use, write the force into Set force entry and confirm by pressing <enter\>. After that the Toggle PID button can be pressed and motor will automatically chase the defined position. To controll the left and right winder simultaneously (i.e. almost symetrically), togle the Entangle button. But make sure that for each of the two, some force was set before a (just by clicking into force entry and pressing <enter\>) and both PID buttons are switched off.
+
+## Notes for Voice Research Lab members
+ - In a default connection, the stepper motors so as the strain-gauges (forcemeters) are connected to the Labjack U6 and the Labjack is connected to a PC or notebook. This allows to wind or unwind the motors and to use the PID regulator but you cannot read signal directly from the strain-gauges.
+ - The alternate connection is as follows: plug the D-SUB9 connectors from the strain-gauges to the DEWE-43A and the rest of the connections leave the same. This allows to read an uncalibrated (but synchronized with other DEWE's inputs) signal from the strain-gauges directly to the DEWE-43A and to a PC. Of course, the PID regulation cannot work and also one has to calibrate the strain-gauges.    
