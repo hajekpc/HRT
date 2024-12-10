@@ -6,7 +6,7 @@ This project was developed as an enhancement to an existing experimental setup t
  
 But big credits also becomes to:
  - Lukáš Kouřil: lukas.kouril@upol.cz
- - Petr Hájek: petr.hajek@upol.cz
+ - Petr Hájek: hajek.p@fme.vutbr.cz
  - Hugo Lehoux: hugo.lehoux@upol.cz
 
 ![Experimental Setup](img/setup.jpg)
